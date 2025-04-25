@@ -11,27 +11,93 @@ import json
 from path_utils import path_from_local_root
 
 
-NAME = # TODO: Please give your agent a NAME
+NAME = "singleton"# TODO: Please give your agent a NAME
 
 class MyAgent(MyLSVMAgent):
     def setup(self):
         #TODO: Fill out with anything you want to initialize each auction
-        pass 
-    
+        self.debug = False
+
+    def good_is_3_away(self, good, good_indices):
+        ROW_LENGTH = 6
+        row, col = good_indices[good]
+
+
+        regional_good = self.get_regional_good()
+        if regional_good:
+            center_row, center_col = good_indices[self.get_regional_good()]
+            return (abs(col - center_col) + abs(row - center_row)) <= 3
+        else:
+            return True
+
+
+    def initial_bid(self) -> dict:
+        bids = {}
+        for good in self.get_goods():
+            if not self.good_is_3_away(good, self.get_goods_to_index()):
+                continue
+            self_valuation = self.get_valuation(good)
+            if self.get_current_prices_map() and self_valuation < self.get_current_prices_map()[good]:
+                continue
+            tentative_price = max(self.get_min_bids()[good], self_valuation)
+            bids[good] = tentative_price
+        if not self.is_valid_bid_bundle(bids) and self.debug:
+            print(("regional" if self.get_regional_good() else "national"), ", bids: ", bids)
+            print("Detected invalid bundle")
+            exit(0)
+        return bids
+
+
     def national_bidder_strategy(self): 
         # TODO: Fill out with your national bidder strategy
         min_bids = self.get_min_bids()
         valuations = self.get_valuations() 
+        if len(self.get_tentative_allocation()) == 0:
+            return self.initial_bid()
+
         bids = {} 
-        ...
+        current_valuation = self.calc_total_valuation(self.get_tentative_allocation())
+        working_bundle = self.get_tentative_allocation().copy()
+        for good in self.get_goods():
+            if good in self.get_tentative_allocation():
+                continue
+            working_bundle.add(good)
+            new_valuation = self.calc_total_valuation(working_bundle)
+            working_bundle.remove(good)
+            valuation_added = new_valuation - current_valuation
+            if valuation_added > self.get_min_bids()[good]:
+                bids[good] = self.get_min_bids()[good]
+        
+        if not self.is_valid_bid_bundle(bids) and self.debug:
+            print("Detected invalid bundle")
+            exit(0)
+
         return bids
 
     def regional_bidder_strategy(self): 
         # TODO: Fill out with your regional bidder strategy
         min_bids = self.get_min_bids()
         valuations = self.get_valuations() 
+        if len(self.get_tentative_allocation()) == 0:
+            return self.initial_bid()
+        
         bids = {} 
-        ...
+        current_valuation = self.calc_total_valuation(self.get_tentative_allocation())
+        working_bundle = self.get_tentative_allocation().copy()
+        for good in self.get_goods():
+            if good in self.get_tentative_allocation():
+                continue
+            working_bundle.add(good)
+            new_valuation = self.calc_total_valuation(working_bundle)
+            working_bundle.remove(good)
+            valuation_added = new_valuation - current_valuation
+            if valuation_added > self.get_min_bids()[good]:
+                bids[good] = self.get_min_bids()[good]
+
+        if not self.is_valid_bid_bundle(bids) and self.debug:
+            print("Detected invalid bundle")
+            exit(0)
+
         return bids
 
     def get_bids(self):
